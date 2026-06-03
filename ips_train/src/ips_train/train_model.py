@@ -22,7 +22,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, f1_score, roc_auc_score
 from sklearn.model_selection import cross_val_score, train_test_split
 
-from preprocessing import preprocess
+from .preprocessing import preprocess
 
 # ──────────────────────────────────────────────
 # Config

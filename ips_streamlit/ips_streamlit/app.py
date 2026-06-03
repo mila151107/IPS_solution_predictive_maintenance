@@ -11,7 +11,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
-from preprocessing import preprocess
+from ips_train.preprocessing import preprocess
 
 # ──────────────────────────────────────────────
 # Config

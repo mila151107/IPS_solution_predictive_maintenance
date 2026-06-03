@@ -1,0 +1,22 @@
+[project]
+name = "ips-streamlit"
+version = "0.1.0"
+description = "Webapp package for IPS"
+authors = [
+    {name = "Mila"}
+]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "joblib",
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "streamlit",
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
