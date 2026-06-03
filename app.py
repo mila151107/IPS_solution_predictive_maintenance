@@ -88,7 +88,7 @@ def load_and_train():
 
     # SMOTE
     smote = SMOTE(sampling_strategy=0.3, random_state=42)
-    X_train_sm, y_train_sm = smote.fit_resample(X_train, y_train)
+    X_train, y_train = smote.fit_resample(X_train, y_train)
 
     # Train models
     lgbm = LGBMClassifier(n_estimators=100, learning_rate=0.05, num_leaves=15,
@@ -96,8 +96,8 @@ def load_and_train():
                            importance_type="gain", random_state=42)
     rf   = RandomForestClassifier(n_estimators=100, max_depth=5,
                                    class_weight="balanced", random_state=42)
-    lgbm.fit(X_train_sm, y_train_sm)
-    rf.fit(X_train_sm, y_train_sm)
+    lgbm.fit(X_train, y_train_sm)
+    rf.fit(X_train, y_train_sm)
 
     # Predictions
     y_proba_rf   = rf.predict_proba(X_test)[:, 1]
