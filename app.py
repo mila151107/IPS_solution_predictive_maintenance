@@ -96,8 +96,8 @@ def load_and_train():
                            importance_type="gain", random_state=42)
     rf   = RandomForestClassifier(n_estimators=100, max_depth=5,
                                    class_weight="balanced", random_state=42)
-    lgbm.fit(X_train, y_train_sm)
-    rf.fit(X_train, y_train_sm)
+    lgbm.fit(X_train, y_train)
+    rf.fit(X_train, y_train)
 
     # Predictions
     y_proba_rf   = rf.predict_proba(X_test)[:, 1]
@@ -232,4 +232,5 @@ st.divider()
 
 st.caption(f"Dataset: AI4I 2020 Predictive Maintenance | Models: LightGBM + Random Forest | "
            f"[GitHub]({GITHUB_URL})")
+
 
