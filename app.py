@@ -132,7 +132,7 @@ st.divider()
 # Machine risk assessment — 2 charts
 # ──────────────────────────────────────────────
 
-st.subheader("🎯 Machine Risk Assessment")
+st.subheader(" Machine Risk Assessment")
 
 high_risk = results[results["failure_probability"] >= 70]
 med_risk  = results[(results["failure_probability"] >= 30) &
@@ -166,8 +166,8 @@ def risk_color(p):
 bar_colors = [risk_color(p) for p in sample["failure_probability"]]
 
 fig = make_subplots(rows=1, cols=2,
-                    subplot_titles=("Failure Probability by Machine",
-                                    "Failure Type vs Probability"))
+                    subplot_titles=("<sup>Failure Probability by Machine</sup>",
+                                    "<sup>Failure Type vs Probability</sup>"))
 
 # Chart 1 — horizontal bar colored by risk level
 fig.add_trace(go.Bar(
