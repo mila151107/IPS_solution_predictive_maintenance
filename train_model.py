@@ -6,7 +6,7 @@ on AI4I 2020 Predictive Maintenance Dataset.
 
 Usage:
     python train_model.py
-    python train_model.py --input my_data.csv --threshold 0.25
+    python train_model.py --input my_data.csv --threshold 0.70
 """
 
 import argparse
@@ -14,6 +14,7 @@ import os
 import joblib
 import pandas as pd
 from xgboost import XGBClassifier
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score, roc_auc_score, precision_score, recall_score
@@ -37,27 +38,39 @@ CV_FOLDS     = 5
 
 
 # ── Models ────────────────────────────────────
-scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()*0.2
 
 def get_models(spw: float) -> dict:
+    xgb_base = XGBClassifier(
+        n_estimators=100,
+        learning_rate=0.01,
+        max_depth=4,
+        min_child_weight=10,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        scale_pos_weight=spw,
+        eval_metric="aucpr",
+        random_state=RANDOM_STATE,
+    )
     return {
-        "XGBoost": XGBClassifier(
-            n_estimators=100, learning_rate=0.01, max_depth=10,
-            scale_pos_weight=spw, eval_metric="aucpr", random_state=42,
+        # XGBoost wrapped in calibration — gives realistic spread probabilities
+        "XGBoost": CalibratedClassifierCV(xgb_base, cv=5, method="isotonic"),
+        "Random Forest": RandomForestClassifier(
+            n_estimators=200,
+            max_depth=6,
+            min_samples_leaf=20,
+            min_samples_split=10,
+            max_features="sqrt",
+            max_samples=0.8,
+            class_weight="balanced_subsample",
+            random_state=RANDOM_STATE,
         ),
-   "Random Forest": RandomForestClassifier(
-    n_estimators=300,         
-    max_depth=6,              
-    min_samples_leaf=20,      
-    min_samples_split=10,     
-    max_features="sqrt",
-    max_samples=0.8,           
-    class_weight="balanced_subsample",
-    random_state=42
-),
         "Logistic Regression": LogisticRegression(
-            max_iter=10000, C=0.1, solver="saga", penalty="l2",
-            class_weight="balanced", random_state=42,
+            max_iter=10000,
+            C=0.1,
+            solver="saga",
+            penalty="l1",
+            class_weight="balanced",
+            random_state=RANDOM_STATE,
         ),
     }
 
@@ -65,21 +78,21 @@ def get_models(spw: float) -> dict:
 # ── Evaluate ──────────────────────────────────
 
 def evaluate(model, X_tr, X_te, y_tr, y_te, name, threshold, cv):
-    y_proba   = model.predict_proba(X_te)[:, 1]
-    y_pred    = (y_proba >= threshold).astype(int)
-    cv_mean   = cross_val_score(model, X_tr, y_tr, cv=cv, scoring="f1").mean()
+    y_proba = model.predict_proba(X_te)[:, 1]
+    y_pred  = (y_proba >= threshold).astype(int)
+    cv_mean = cross_val_score(model, X_tr, y_tr, cv=cv, scoring="f1").mean()
 
     print(f"{name:25s} | F1: {f1_score(y_te, y_pred):.4f} | "
           f"AUC: {roc_auc_score(y_te, y_proba):.4f} | "
-          f"P: {precision_score(y_te, y_pred):.4f} | "
-          f"R: {recall_score(y_te, y_pred):.4f} | "
+          f"P: {precision_score(y_te, y_pred, zero_division=0):.4f} | "
+          f"R: {recall_score(y_te, y_pred, zero_division=0):.4f} | "
           f"CV F1: {cv_mean:.4f}")
 
     return {
         "f1":        f1_score(y_te, y_pred),
         "roc_auc":   roc_auc_score(y_te, y_proba),
-        "precision": precision_score(y_te, y_pred),
-        "recall":    recall_score(y_te, y_pred),
+        "precision": precision_score(y_te, y_pred, zero_division=0),
+        "recall":    recall_score(y_te, y_pred, zero_division=0),
         "cv_f1":     cv_mean,
     }
 
@@ -89,11 +102,11 @@ def evaluate(model, X_tr, X_te, y_tr, y_te, name, threshold, cv):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--input",     default="predictive_maintenance.csv")
-    parser.add_argument("--threshold", default=0.25, type=float)
+    parser.add_argument("--threshold", default=0.70, type=float)
     args, _ = parser.parse_known_args()
 
     # 1. Load & preprocess
-    print(f"\n Loading: {args.input}")
+    print(f"\n📂 Loading: {args.input}")
     df = pd.read_csv(args.input)
     X, y, _ = preprocess(df, fit=True)
     X.columns = X.columns.str.replace(r"[\[\]/]", "_", regex=True).str.strip()
@@ -129,8 +142,8 @@ if __name__ == "__main__":
                                  name, args.threshold, cv)
 
     # 6. Summary
-    best = "Random Forest"
-    print(f"\n🏆 Selected model: {best} (fixed choice)")
+    best = "XGBoost"
+    print(f"\n🏆 Selected model: {best}")
 
     # 7. Save
     os.makedirs(ARTIFACT_DIR, exist_ok=True)

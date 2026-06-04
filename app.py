@@ -85,8 +85,8 @@ with st.spinner("⚙️ Loading models and data..."):
 
 st.sidebar.header("⚙️ Settings")
 threshold  = st.sidebar.slider("Failure prediction threshold",
-                                min_value=0.10, max_value=0.50,
-                                value=0.25, step=0.05,
+                                min_value=0.10, max_value=0.90,
+                                value=0.70, step=0.05,
                                 help="Lower = catch more failures. Higher = fewer false alarms.")
 mix_high   = st.sidebar.slider("High risk machines",   1, 10, 3)
 mix_medium = st.sidebar.slider("Medium risk machines", 1, 10, 3)
@@ -143,7 +143,6 @@ n_high   = min(mix_high,   len(high_risk))
 n_medium = min(mix_medium, len(med_risk))
 n_low    = min(mix_low,    len(low_risk))
 
-# Pick machines spread across the probability range within each group
 def spread_sample(group, n):
     if n <= 0 or len(group) == 0:
         return pd.DataFrame()
