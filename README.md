@@ -49,7 +49,7 @@ pytest test_train_model.py -v
 - ~0.18% of rows contain an actual failure type but are labelled `Target = 0`
 - AI-powered data quality audit using Groq LLaMA 3.3 (null rates, duplicates, outliers)
 
-This notebook is for analysis only and is not part of the production pipeline.
+#### This notebook is for analysis only and is not part of the production pipeline.
 ---
 ##  Links
 
