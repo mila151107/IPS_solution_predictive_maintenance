@@ -143,10 +143,18 @@ n_high   = min(mix_high,   len(high_risk))
 n_medium = min(mix_medium, len(med_risk))
 n_low    = min(mix_low,    len(low_risk))
 
+# Pick machines spread across the probability range within each group
+def spread_sample(group, n):
+    if n <= 0 or len(group) == 0:
+        return pd.DataFrame()
+    group = group.sort_values("failure_probability")
+    indices = [i * len(group) // n for i in range(n)]
+    return group.iloc[indices]
+
 sample = pd.concat([
-    high_risk.sample(n_high,   random_state=42) if n_high   > 0 else pd.DataFrame(),
-    med_risk.sample(n_medium,  random_state=42) if n_medium > 0 else pd.DataFrame(),
-    low_risk.sample(n_low,     random_state=42) if n_low    > 0 else pd.DataFrame(),
+    spread_sample(high_risk, n_high),
+    spread_sample(med_risk,  n_medium),
+    spread_sample(low_risk,  n_low),
 ]).sort_values("failure_probability", ascending=True)
 
 labels = [f"Machine {idx}" for idx in sample.index]
