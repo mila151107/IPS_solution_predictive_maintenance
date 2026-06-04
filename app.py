@@ -55,8 +55,9 @@ def load_and_prepare():
     df1 = df.copy()
     df  = compute_features(df)
 
-    cols_drop = [TARGET_COL, "UDI", "Process temperature [K]",
-                 "Air temperature [K]", "Torque/RPM ratio", "Product ID"]
+    cols_drop =[TARGET_COL, "UDI", "Process temperature [K]",
+             "Air temperature [K]", "Torque/RPM ratio", "Product ID",
+             "Failure Type"]
     X = df.drop(columns=cols_drop, errors="ignore")
     y = df[TARGET_COL]
 
