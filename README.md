@@ -6,7 +6,9 @@ dataset from kaggel - https://www.kaggle.com/datasets/shivamb/machine-predictive
 
 Industrial machines operate under varying thermal, mechanical, and rotational conditions.
 The goal is to predict machine failure before it occurs using sensor readings so that
-maintenance teams can intervene proactively and avoid unplanned downtime. The dataset is labled and model 
+maintenance teams can intervene proactively and avoid unplanned downtime. The dataset is labled and model use this knowelage to learn patterns inside data,
+and then predict probbality of failure. Alos new columns are computed from alredy available ones- e.g. Power
+.pptx slides are attached to support description of this file
 
 In this context a **false negative** (missed failure) is significantly more costly than
 a **false positive** (unnecessary inspection) — this asymmetry drives all modelling decisions.
