@@ -177,7 +177,7 @@ fig.add_trace(go.Bar(
     marker_color=bar_colors,
     text=[f"{p:.1f}% — {r}" for p, r in
           zip(sample["failure_probability"], sample["risk_level"])],
-    textposition="outside",
+    textposition="inside",
     hovertemplate="<b>%{y}</b><br>Probability: %{x:.2f}%<extra></extra>",
 ), row=1, col=1)
 
