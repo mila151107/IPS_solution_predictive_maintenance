@@ -69,10 +69,10 @@ def load_and_train():
     X_test_mm  = pd.DataFrame(mm.transform(X_test),      columns=X_test.columns)
 
     # Fit tree models
-    lgbm = LGBMClassifier(n_estimators=100, learning_rate=0.05, num_leaves=15,
-                           max_depth=5, min_child_samples=20, class_weight="balanced",
+    lgbm = LGBMClassifier(n_estimators=200, learning_rate=0.01, num_leaves=10,
+                           max_depth=4, min_child_samples=30, class_weight="balanced",
                            importance_type="gain", random_state=42)
-    rf   = RandomForestClassifier(n_estimators=100, max_depth=5,
+    rf   = RandomForestClassifier(n_estimators=200, max_depth=10,
                                    class_weight="balanced", random_state=42)
     lr   = LogisticRegression(max_iter=5000, C=1.0, class_weight="balanced",
                                solver="saga", random_state=42)
