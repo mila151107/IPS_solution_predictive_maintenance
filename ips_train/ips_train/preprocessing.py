@@ -9,7 +9,6 @@ Usage:
 
 import os
 
-import click
 import joblib
 import numpy as np
 import pandas as pd
@@ -24,7 +23,6 @@ from .data import (
     COLUMNS_TO_DROP,
     DELTA_TEMPERATURE_COL,
     FAILURE_TYPE_COL,
-    INPUT_DATASET,
     NUMERICAL_COLS,
     POWER_COL,
     PRODUCT_ID_COL,
@@ -40,10 +38,10 @@ from .data import (
     UDI_COL,
 )
 
-
 # ──────────────────────────────────────────────
 # Step 1 — Feature Engineering
 # ──────────────────────────────────────────────
+
 
 def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     """Adds engineered features derived from raw sensor columns."""
@@ -59,6 +57,7 @@ def compute_features(df: pd.DataFrame) -> pd.DataFrame:
 # ──────────────────────────────────────────────
 # Step 2 — Custom Transformers
 # ──────────────────────────────────────────────
+
 
 class ColumnDropper(BaseEstimator, TransformerMixin):
     def __init__(self, columns):
@@ -177,22 +176,3 @@ def load_preprocessor(path: str = PREPROCESSOR_PATH) -> Pipeline:
     if not os.path.exists(path):
         raise FileNotFoundError(f"No preprocessor found at: {path}. Run preprocessing.py first.")
     return joblib.load(path)
-
-
-@click.option("--input", type=str, default=INPUT_DATASET, help="Path to raw CSV")
-@click.option("--ouptut", type=str, default=PREPROCESSOR_PATH, help="Output path")
-def main(input_path: str) -> None:
-    print(f"📂 Loading: {args.input}")
-    df = pd.read_csv(input_path)
-    print(f"   Raw shape: {df.shape}")
-
-    X, y, pipeline = preprocess(df, fit=True)
-
-    print(f"\n✅ Processed shape: {X.shape}")
-    print(f"   Features: {X.columns.tolist()}")
-    print(f"\n   Target distribution:\n{y.value_counts().to_string()}")
-
-    save_preprocessor(pipeline)
-
-if __name__ == "__main__":
-    main()

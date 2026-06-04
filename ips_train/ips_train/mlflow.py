@@ -17,7 +17,6 @@ from sklearn.preprocessing import MinMaxScaler
 from preprocessing import preprocess
 from train_model import get_models, evaluate
 
-
 EXPERIMENT = "predictive_maintenance"
 TEST_SIZE = 0.3
 RANDOM_STATE = 42

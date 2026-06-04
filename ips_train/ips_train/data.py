@@ -1,3 +1,5 @@
+"""Data-related constants and paths."""
+
 import os
 
 UDI_COL = "UDI"
@@ -28,5 +30,8 @@ NUMERICAL_COLS = [
     STRESS_INDEX_COL,
 ]
 
-INPUT_DATASET = os.path.join(__file__, "..", "..", "predictive_maintenance.csv")
-PREPROCESSOR_PATH = os.path.join(__file__, "..", "..", "artifacts", "preprocessor.joblib")
+MAIN_FOLDER = os.path.join(os.path.dirname(__file__), "..", "..")
+ARTIFACTS_FOLDER = os.path.join(MAIN_FOLDER, "artifacts")
+
+INPUT_DATASET = os.path.join(MAIN_FOLDER, "predictive_maintenance.csv")
+PREPROCESSOR_PATH = os.path.join(ARTIFACTS_FOLDER, "preprocessor.joblib")

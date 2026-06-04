@@ -7,7 +7,6 @@ Usage:
     python train_model.py --input my_data.csv --threshold 0.70
 """
 
-import argparse
 import os
 import joblib
 import pandas as pd
@@ -19,7 +18,7 @@ from sklearn.metrics import f1_score, roc_auc_score, precision_score, recall_sco
 from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
 from sklearn.preprocessing import MinMaxScaler
 
-from preprocessing import preprocess
+from .preprocessing import preprocess
 
 ARTIFACT_DIR = "artifacts"
 PATHS = {
@@ -91,34 +90,24 @@ def evaluate(model, X_tr, X_te, y_tr, y_te, name, threshold, cv):
     }
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="predictive_maintenance.csv")
-    parser.add_argument("--threshold", default=0.70, type=float)
-    args, _ = parser.parse_known_args()
-
-    # 1. Load & preprocess
-    print(f"\n📂 Loading: {args.input}")
-    df = pd.read_csv(args.input)
+def train_model(input_path: str, threshold: float):
+    print(f"\n📂 Loading: {input_path}")
+    df = pd.read_csv(input_path)
     X, y, _ = preprocess(df, fit=True)
     X.columns = X.columns.str.replace(r"[\[\]/]", "_", regex=True).str.strip()
     print(f"   Shape: {X.shape} | Failures: {y.sum()} / {len(y)}")
 
-    # 2. Stratified split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
     )
 
-    # 3. scale_pos_weight for XGBoost
     spw = (y_train == 0).sum() / (y_train == 1).sum()
     print(f"   scale_pos_weight: {spw:.2f}")
 
-    # 4. MinMax scale for Logistic Regression only
     mm = MinMaxScaler()
     X_train_mm = pd.DataFrame(mm.fit_transform(X_train), columns=X_train.columns)
     X_test_mm = pd.DataFrame(mm.transform(X_test), columns=X_test.columns)
 
-    # 5. Train & evaluate
     cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
     models = get_models(spw)
     results = {}
@@ -129,13 +118,11 @@ if __name__ == "__main__":
     for name, model in models.items():
         X_tr, X_te = (X_train_mm, X_test_mm) if name == "Logistic Regression" else (X_train, X_test)
         model.fit(X_tr, y_train)
-        results[name] = evaluate(model, X_tr, X_te, y_train, y_test, name, args.threshold, cv)
+        results[name] = evaluate(model, X_tr, X_te, y_train, y_test, name, threshold, cv)
 
-    # 6. Summary
     best = "XGBoost"
     print(f"\n🏆 Selected model: {best}")
 
-    # 7. Save
     os.makedirs(ARTIFACT_DIR, exist_ok=True)
     for name, model in models.items():
         joblib.dump(model, PATHS[name])
