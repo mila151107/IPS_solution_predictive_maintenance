@@ -2,8 +2,8 @@
 app.py
 ------
 Streamlit app for the AI4I 2020 Predictive Maintenance Dataset.
-Random Forest drives the dashboard visuals.
-XGBoost and Logistic Regression run in background.
+XGBoost drives the dashboard visuals.
+Random Forest and Logistic Regression run in background.
 """
 
 import os
@@ -38,11 +38,11 @@ COLORS_MAP = {
 
 @st.cache_resource
 def load_models():
-    rf  = joblib.load(os.path.join(ARTIFACT_DIR, "rf_model.joblib"))
     xgb = joblib.load(os.path.join(ARTIFACT_DIR, "xgb_model.joblib"))
+    rf  = joblib.load(os.path.join(ARTIFACT_DIR, "rf_model.joblib"))
     lr  = joblib.load(os.path.join(ARTIFACT_DIR, "lr_model.joblib"))
     mm  = joblib.load(os.path.join(ARTIFACT_DIR, "mm_scaler.joblib"))
-    return {"Random Forest": rf, "XGBoost": xgb, "Logistic Regression": lr}, mm
+    return {"XGBoost": xgb, "Random Forest": rf, "Logistic Regression": lr}, mm
 
 
 @st.cache_data
@@ -95,24 +95,24 @@ st.sidebar.divider()
 st.sidebar.markdown(f"🔗 [GitHub Repository]({GITHUB_URL})")
 
 # ──────────────────────────────────────────────
-# Predictions — RF drives visuals
-# XGBoost + LR run in background
+# Predictions — XGBoost drives visuals
+# RF + LR run in background
 # ──────────────────────────────────────────────
 
-rf_proba  = models["Random Forest"].predict_proba(X)[:, 1]
-rf_pred   = (rf_proba >= threshold).astype(int)
-
 xgb_proba = models["XGBoost"].predict_proba(X)[:, 1]
+xgb_pred  = (xgb_proba >= threshold).astype(int)
+
+rf_proba  = models["Random Forest"].predict_proba(X)[:, 1]
 lr_proba  = models["Logistic Regression"].predict_proba(
     pd.DataFrame(mm_scaler.transform(X), columns=X.columns)
 )[:, 1]
 
 results = X.copy()
-results["failure_probability"] = (rf_proba * 100).round(2)
+results["failure_probability"] = (xgb_proba * 100).round(2)
 results["risk_level"]          = results["failure_probability"].apply(
     lambda x: "🔴 HIGH" if x >= 70 else "🟡 MEDIUM" if x >= 30 else "🟢 LOW"
 )
-results["predicted_failure"]  = rf_pred
+results["predicted_failure"]  = xgb_pred
 results["Failure Type Text"]  = df1["Failure Type"].values
 results["Actual Target"]      = y.values
 
@@ -122,10 +122,10 @@ results["Actual Target"]      = y.values
 
 st.subheader("📊 Model Performance")
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Random Forest Accuracy", f"{accuracy_score(y, rf_pred):.4f}")
-c2.metric("Random Forest AUC",      f"{roc_auc_score(y, rf_proba):.4f}")
-c3.metric("XGBoost AUC",            f"{roc_auc_score(y, xgb_proba):.4f}")
-c4.metric("Threshold",              f"{threshold:.2f}")
+c1.metric("XGBoost Accuracy",  f"{accuracy_score(y, xgb_pred):.4f}")
+c2.metric("XGBoost AUC",       f"{roc_auc_score(y, xgb_proba):.4f}")
+c3.metric("Random Forest AUC", f"{roc_auc_score(y, rf_proba):.4f}")
+c4.metric("Threshold",         f"{threshold:.2f}")
 st.divider()
 
 # ──────────────────────────────────────────────
@@ -166,52 +166,4 @@ fig = make_subplots(rows=1, cols=2,
 fig.add_trace(go.Bar(
     x=sample["failure_probability"].round(2),
     y=labels,
-    orientation="h",
-    marker_color=bar_colors,
-    text=[f"{p:.1f}% — {r}" for p, r in
-          zip(sample["failure_probability"], sample["risk_level"])],
-    textposition="outside",
-    hovertemplate="<b>%{y}</b><br>Probability: %{x:.2f}%<extra></extra>",
-), row=1, col=1)
-
-# Chart 2 — scatter colored by failure type
-for ftype, group in sample.groupby("Failure Type Text"):
-    idx_positions = [list(sample.index).index(i) for i in group.index]
-    fig.add_trace(go.Scatter(
-        x=group["failure_probability"].round(2),
-        y=[labels[i] for i in idx_positions],
-        mode="markers",
-        name=ftype,
-        marker=dict(color=COLORS_MAP.get(ftype, "gray"), size=14),
-        hovertemplate=f"<b>%{{y}}</b><br>Type: {ftype}<br>Probability: %{{x:.2f}}%<extra></extra>",
-    ), row=1, col=2)
-
-fig.add_vline(x=70, line_dash="dash", line_color="red",
-              annotation_text="High (70%)",   row=1, col=2)
-fig.add_vline(x=30, line_dash="dash", line_color="orange",
-              annotation_text="Medium (30%)", row=1, col=2)
-fig.update_layout(height=500, showlegend=True, plot_bgcolor="white")
-fig.update_xaxes(title_text="Failure Probability (%)", range=[0, 130], row=1, col=1)
-fig.update_xaxes(title_text="Failure Probability (%)", range=[0, 120], row=1, col=2)
-
-st.plotly_chart(fig, use_container_width=True)
-st.divider()
-
-# ──────────────────────────────────────────────
-# Summary table
-# ──────────────────────────────────────────────
-
-st.subheader("📋 Risk Summary Table")
-display_cols = ["failure_probability", "risk_level", "Failure Type Text", "Actual Target"]
-col_rename   = {"failure_probability": "Probability (%)", "risk_level": "Risk Level",
-                "Failure Type Text":   "Failure Type",    "Actual Target": "Actual Failure"}
-st.dataframe(sample[display_cols].rename(columns=col_rename), use_container_width=True)
-st.divider()
-
-# ──────────────────────────────────────────────
-# Footer
-# ──────────────────────────────────────────────
-
-st.caption(f"Dataset: AI4I 2020 Predictive Maintenance | "
-           f"Dashboard: Random Forest | Threshold: {threshold} | "
-           f"[GitHub]({GITHUB_URL})")
+    ori
