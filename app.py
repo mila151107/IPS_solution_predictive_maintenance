@@ -4,21 +4,16 @@ app.py
 Streamlit app for the AI4I 2020 Predictive Maintenance Dataset.
 """
 
-import os
 import joblib
-import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
 
 from preprocessing import preprocess
 
-# ──────────────────────────────────────────────
-# Config
-# ──────────────────────────────────────────────
+# ── Config ────────────────────────────────────
 
 DATA_PATH  = "predictive_maintenance.csv"
-LGBM_PATH  = "artifacts/lgbm_model.joblib"
 XGB_PATH   = "artifacts/xgb_model.joblib"
 RF_PATH    = "artifacts/rf_model.joblib"
 LR_PATH    = "artifacts/lr_model.joblib"
@@ -26,9 +21,7 @@ MM_PATH    = "artifacts/mm_scaler.joblib"
 GITHUB_URL = "https://github.com/mila151107/IPS_solution_predictive_maintenance"
 
 
-# ──────────────────────────────────────────────
-# Load resources
-# ──────────────────────────────────────────────
+# ── Load resources ────────────────────────────
 
 @st.cache_data
 def load_data():
@@ -36,12 +29,12 @@ def load_data():
 
 @st.cache_resource
 def load_models():
-    lgbm = joblib.load(LGBM_PATH)
-    xgb  = joblib.load(XGB_PATH)
-    rf   = joblib.load(RF_PATH)
-    lr   = joblib.load(LR_PATH)
-    mm   = joblib.load(MM_PATH)
-    return lgbm, xgb, rf, lr, mm
+    return (
+        joblib.load(XGB_PATH),
+        joblib.load(RF_PATH),
+        joblib.load(LR_PATH),
+        joblib.load(MM_PATH),
+    )
 
 @st.cache_data
 def get_processed_data():
@@ -51,9 +44,7 @@ def get_processed_data():
     return X, y
 
 
-# ──────────────────────────────────────────────
-# Layout
-# ──────────────────────────────────────────────
+# ── Layout ────────────────────────────────────
 
 st.set_page_config(page_title="Predictive Maintenance", page_icon="🔧", layout="wide")
 st.title("🔧 Predictive Maintenance — Failure Risk Dashboard")
@@ -61,28 +52,23 @@ st.markdown(f"Real-time machine failure risk assessment. [View source on GitHub]
 st.divider()
 
 with st.spinner("Loading data and models..."):
-    df_raw                    = load_data()
-    lgbm, xgb, rf, lr, mm_scaler = load_models()
-    X, y                      = get_processed_data()
+    df_raw              = load_data()
+    xgb, rf, lr, mm_scaler = load_models()
+    X, y                = get_processed_data()
 
 
-# ──────────────────────────────────────────────
-# Sidebar
-# ──────────────────────────────────────────────
+# ── Sidebar ───────────────────────────────────
 
 st.sidebar.header("⚙️ Settings")
 
 model_name = st.sidebar.radio(
     "Select model",
-    ["LightGBM", "XGBoost", "Random Forest", "Logistic Regression"]
+    ["XGBoost", "Random Forest", "Logistic Regression"]
 )
 
 threshold = st.sidebar.slider(
     "Failure prediction threshold",
-    min_value=0.10,
-    max_value=0.50,
-    value=0.25,
-    step=0.05,
+    min_value=0.10, max_value=0.50, value=0.25, step=0.05,
     help="Lower = catch more failures. Higher = fewer false alarms."
 )
 
@@ -95,12 +81,9 @@ st.sidebar.divider()
 st.sidebar.markdown(f"🔗 [GitHub Repository]({GITHUB_URL})")
 
 
-# ──────────────────────────────────────────────
-# Predictions
-# ──────────────────────────────────────────────
+# ── Predictions ───────────────────────────────
 
 model_map = {
-    "LightGBM":            lgbm,
     "XGBoost":             xgb,
     "Random Forest":       rf,
     "Logistic Regression": lr,
@@ -117,9 +100,7 @@ y_proba = model.predict_proba(X_input)[:, 1]
 y_pred  = (y_proba >= threshold).astype(int)
 
 
-# ──────────────────────────────────────────────
-# Metrics row
-# ──────────────────────────────────────────────
+# ── Metrics row ───────────────────────────────
 
 total      = len(y_pred)
 failures   = int(y_pred.sum())
@@ -133,9 +114,7 @@ c4.metric("Threshold",             f"{threshold:.2f}")
 st.divider()
 
 
-# ──────────────────────────────────────────────
-# Distribution chart
-# ──────────────────────────────────────────────
+# ── Distribution chart ────────────────────────
 
 st.subheader("🎯 Failure Probability Distribution")
 
@@ -168,9 +147,7 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 
 
-# ──────────────────────────────────────────────
-# Results table
-# ──────────────────────────────────────────────
+# ── Results table ─────────────────────────────
 
 st.subheader("📋 Prediction Results")
 
@@ -185,9 +162,7 @@ st.dataframe(
 st.divider()
 
 
-# ──────────────────────────────────────────────
-# Single machine prediction
-# ──────────────────────────────────────────────
+# ── Single machine prediction ─────────────────
 
 st.subheader("🔍 Predict a Single Machine")
 st.markdown("Adjust sensor values and click **Predict**.")
@@ -234,9 +209,7 @@ if st.button("🔮 Predict", use_container_width=True):
         st.success(f"🟢 **No failure predicted** — {proba*100:.1f}% probability")
 
 
-# ──────────────────────────────────────────────
-# Footer
-# ──────────────────────────────────────────────
+# ── Footer ────────────────────────────────────
 
 st.divider()
 st.caption(
