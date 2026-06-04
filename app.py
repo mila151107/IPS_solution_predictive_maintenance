@@ -13,7 +13,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.metrics import accuracy_score, roc_auc_score
-from preprocessing import compute_features, CategoricalEncoder, NumericalScaler, CATEGORICAL_COLS, NUMERICAL_COLS, TARGET_COL
+from ips_train.preprocessing import compute_features, CategoricalEncoder, NumericalScaler, CATEGORICAL_COLS, NUMERICAL_COLS, TARGET_COL
 
 # ──────────────────────────────────────────────
 # Config
