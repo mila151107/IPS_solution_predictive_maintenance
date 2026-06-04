@@ -1,5 +1,5 @@
 project predictive maitenace
-dataset from kaggel - https://www.kaggle.com/datasets/shivamb/machine-predictive-maintenance-classification/data
+dataset from kaggel
 ---
 
 ##  Problem Statement
@@ -22,7 +22,7 @@ Three models are trained and evaluated:
 | Random Forest | `class_weight="balanced_subsample"` |
 | Logistic Regression | `class_weight="balanced"` + L1 penalty |
 
-XGBoost drives the dashboard visuals. Random Forest and Logistic Regression run in background.
+## XGBoost drives the dashboard visuals. Random Forest and Logistic Regression run in background.
 Primary metric is **Recall** — catching real failures is the priority.
 ---
 ## How to Run
