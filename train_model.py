@@ -37,20 +37,27 @@ CV_FOLDS     = 5
 
 
 # ── Models ────────────────────────────────────
+scale_pos_weight = (y_train == 0).sum() / (y_train == 1).sum()*0.2
 
 def get_models(spw: float) -> dict:
     return {
         "XGBoost": XGBClassifier(
-            n_estimators=100, learning_rate=0.01, max_depth=3,
-            scale_pos_weight=spw, eval_metric="aucpr", random_state=RANDOM_STATE,
+            n_estimators=100, learning_rate=0.01, max_depth=10,
+            scale_pos_weight=spw, eval_metric="aucpr", random_state=42,
         ),
-        "Random Forest": RandomForestClassifier(
-            n_estimators=100, max_depth=5, min_samples_leaf=14,
-            max_features="sqrt", class_weight="balanced_subsample", random_state=RANDOM_STATE,
-        ),
+   "Random Forest": RandomForestClassifier(
+    n_estimators=300,         
+    max_depth=6,              
+    min_samples_leaf=20,      
+    min_samples_split=10,     
+    max_features="sqrt",
+    max_samples=0.8,           
+    class_weight="balanced_subsample",
+    random_state=42
+),
         "Logistic Regression": LogisticRegression(
-            max_iter=10000, C=0.1, solver="saga", penalty="l1",
-            class_weight="balanced", random_state=RANDOM_STATE,
+            max_iter=10000, C=0.1, solver="saga", penalty="l2",
+            class_weight="balanced", random_state=42,
         ),
     }
 
