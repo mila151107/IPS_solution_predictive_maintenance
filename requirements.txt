@@ -1,0 +1,8 @@
+joblib
+numpy
+pandas
+scikit-learn
+streamlit
+xgboost
+plotly
+ips_train @ git+https://github.com/mila151107/IPS_solution_predictive_maintenance.git#subdirectory=ips_train
