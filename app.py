@@ -166,4 +166,52 @@ fig = make_subplots(rows=1, cols=2,
 fig.add_trace(go.Bar(
     x=sample["failure_probability"].round(2),
     y=labels,
-    ori
+    orientation="h",
+    marker_color=bar_colors,
+    text=[f"{p:.1f}% — {r}" for p, r in
+          zip(sample["failure_probability"], sample["risk_level"])],
+    textposition="outside",
+    hovertemplate="<b>%{y}</b><br>Probability: %{x:.2f}%<extra></extra>",
+), row=1, col=1)
+
+# Chart 2 — scatter colored by failure type
+for ftype, group in sample.groupby("Failure Type Text"):
+    idx_positions = [list(sample.index).index(i) for i in group.index]
+    fig.add_trace(go.Scatter(
+        x=group["failure_probability"].round(2),
+        y=[labels[i] for i in idx_positions],
+        mode="markers",
+        name=ftype,
+        marker=dict(color=COLORS_MAP.get(ftype, "gray"), size=14),
+        hovertemplate=f"<b>%{{y}}</b><br>Type: {ftype}<br>Probability: %{{x:.2f}}%<extra></extra>",
+    ), row=1, col=2)
+
+fig.add_vline(x=70, line_dash="dash", line_color="red",
+              annotation_text="High (70%)",   row=1, col=2)
+fig.add_vline(x=30, line_dash="dash", line_color="orange",
+              annotation_text="Medium (30%)", row=1, col=2)
+fig.update_layout(height=500, showlegend=True, plot_bgcolor="white")
+fig.update_xaxes(title_text="Failure Probability (%)", range=[0, 130], row=1, col=1)
+fig.update_xaxes(title_text="Failure Probability (%)", range=[0, 120], row=1, col=2)
+
+st.plotly_chart(fig, use_container_width=True)
+st.divider()
+
+# ──────────────────────────────────────────────
+# Summary table
+# ──────────────────────────────────────────────
+
+st.subheader("📋 Risk Summary Table")
+display_cols = ["failure_probability", "risk_level", "Failure Type Text", "Actual Target"]
+col_rename   = {"failure_probability": "Probability (%)", "risk_level": "Risk Level",
+                "Failure Type Text":   "Failure Type",    "Actual Target": "Actual Failure"}
+st.dataframe(sample[display_cols].rename(columns=col_rename), use_container_width=True)
+st.divider()
+
+# ──────────────────────────────────────────────
+# Footer
+# ──────────────────────────────────────────────
+
+st.caption(f"Dataset: AI4I 2020 Predictive Maintenance | "
+           f"Dashboard: XGBoost | Threshold: {threshold} | "
+           f"[GitHub]({GITHUB_URL})")
