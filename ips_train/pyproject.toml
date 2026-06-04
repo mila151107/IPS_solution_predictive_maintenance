@@ -13,10 +13,27 @@ dependencies = [
     "numpy",
     "pandas",
     "scikit-learn",
+    "xgboost",
     "lightgbm",
+    "click (>=8.4.1,<9.0.0)",
 ]
 
+[project.scripts]
+ips_train_preprocess = "ips_train.cli:preprocess"
+ips_train_train = "ips_train.cli:train"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "black (>=26.5.1,<27.0.0)",
+    "pytest (>=9.0.3,<10.0.0)"
+]
+
+# Format code with:
+# poetry run black .
+[tool.black]
+line-length = 120
+target-version = ['py314']
