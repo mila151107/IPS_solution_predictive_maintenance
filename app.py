@@ -13,11 +13,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.metrics import f1_score, roc_auc_score
-
-from preprocessing import (
-    compute_features, CategoricalEncoder, NumericalScaler,
-    CATEGORICAL_COLS, NUMERICAL_COLS, TARGET_COL
-)
+from preprocessing import compute_features, CategoricalEncoder, NumericalScaler, CATEGORICAL_COLS, NUMERICAL_COLS, TARGET_COL
 
 # ──────────────────────────────────────────────
 # Config
@@ -55,9 +51,9 @@ def load_and_prepare():
     df1 = df.copy()
     df  = compute_features(df)
 
-    cols_drop =[TARGET_COL, "UDI", "Process temperature [K]",
-             "Air temperature [K]", "Torque/RPM ratio", "Product ID",
-             "Failure Type"]
+    cols_drop = [TARGET_COL, "UDI", "Process temperature [K]",
+                 "Air temperature [K]", "Torque/RPM ratio",
+                 "Product ID", "Failure Type"]
     X = df.drop(columns=cols_drop, errors="ignore")
     y = df[TARGET_COL]
 
@@ -89,12 +85,12 @@ with st.spinner("⚙️ Loading models and data..."):
 # ──────────────────────────────────────────────
 
 st.sidebar.header("⚙️ Settings")
-threshold  = st.sidebar.slider("Failure prediction threshold",
-                                min_value=0.10, max_value=0.50,
-                                value=0.25, step=0.05,
-                                help="Lower = catch more failures. Higher = fewer false alarms.")
-mix_high   = st.sidebar.slider("High risk machines",   1, 10, 5)
-mix_low    = st.sidebar.slider("Medium risk machines", 1, 10, 5)
+threshold = st.sidebar.slider("Failure prediction threshold",
+                               min_value=0.10, max_value=0.50,
+                               value=0.25, step=0.05,
+                               help="Lower = catch more failures. Higher = fewer false alarms.")
+mix_high  = st.sidebar.slider("High risk machines",   1, 10, 5)
+mix_low   = st.sidebar.slider("Medium risk machines", 1, 10, 5)
 st.sidebar.divider()
 st.sidebar.markdown(f"🔗 [GitHub Repository]({GITHUB_URL})")
 
@@ -121,7 +117,7 @@ results["Failure Type Text"]  = df1["Failure Type"].values
 results["Actual Target"]      = y.values
 
 # ──────────────────────────────────────────────
-# Model performance metrics
+# Metrics row
 # ──────────────────────────────────────────────
 
 st.subheader("📊 Model Performance")
@@ -204,9 +200,60 @@ st.dataframe(sample[display_cols].rename(columns=col_rename), use_container_widt
 st.divider()
 
 # ──────────────────────────────────────────────
+# Single machine prediction
+# ──────────────────────────────────────────────
+
+st.subheader("🔍 Predict a Single Machine")
+st.markdown("Adjust the sensor values and click **Predict** to check if the machine will fail.")
+
+c1, c2, c3 = st.columns(3)
+with c1:
+    rpm       = st.number_input("Rotational speed [rpm]", min_value=1000, max_value=3000, value=1500)
+    torque    = st.number_input("Torque [Nm]", min_value=1.0, max_value=100.0, value=40.0)
+with c2:
+    tool_wear = st.number_input("Tool wear [min]", min_value=0, max_value=300, value=100)
+    prod_type = st.selectbox("Product type", ["L", "M", "H"])
+with c3:
+    air_temp  = st.number_input("Air temperature [K]", min_value=295.0, max_value=305.0, value=300.0)
+    proc_temp = st.number_input("Process temperature [K]", min_value=305.0, max_value=315.0, value=310.0)
+
+if st.button("🔮 Predict", use_container_width=True):
+    input_raw = pd.DataFrame([{
+        "UDI": 1, "Product ID": f"{prod_type}-00001",
+        "Type": prod_type,
+        "Air temperature [K]": air_temp,
+        "Process temperature [K]": proc_temp,
+        "Rotational speed [rpm]": rpm,
+        "Torque [Nm]": torque,
+        "Tool wear [min]": tool_wear,
+        "Target": 0, "Failure Type": "No Failure",
+    }])
+
+    input_eng = compute_features(input_raw)
+    cols_drop = [TARGET_COL, "UDI", "Process temperature [K]",
+                 "Air temperature [K]", "Torque/RPM ratio",
+                 "Product ID", "Failure Type"]
+    X_input = input_eng.drop(columns=cols_drop, errors="ignore")
+
+    encoder = CategoricalEncoder(columns=CATEGORICAL_COLS)
+    X_input = encoder.fit_transform(X_input)
+    scaler  = NumericalScaler(columns=NUMERICAL_COLS)
+    X_input = scaler.fit_transform(X_input)
+    X_input.columns = X_input.columns.str.replace(r"[\[\]/]", "_", regex=True).str.strip()
+
+    pred  = models["Random Forest"].predict(X_input)[0]
+    proba = models["Random Forest"].predict_proba(X_input)[0][1]
+
+    if pred == 1:
+        st.error(f"🔴 **Failure predicted** — {proba*100:.1f}% probability of failure")
+    else:
+        st.success(f"🟢 **No failure predicted** — {proba*100:.1f}% probability of failure")
+
+# ──────────────────────────────────────────────
 # Footer
 # ──────────────────────────────────────────────
 
+st.divider()
 st.caption(f"Dataset: AI4I 2020 Predictive Maintenance | "
            f"Dashboard: Random Forest | Threshold: {threshold} | "
            f"[GitHub]({GITHUB_URL})")
