@@ -3,7 +3,11 @@ app.py
 ------
 Streamlit app for the AI4I 2020 Predictive Maintenance Dataset.
 """
+# Change this
+from preprocessing import preprocess
 
+# To this
+from preprocessing import preprocess, ColumnDropper, CategoricalEncoder, NumericalScaler
 import joblib
 import pandas as pd
 import streamlit as st
