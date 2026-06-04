@@ -141,4 +141,71 @@ high_risk = results[results["failure_probability"] >= 70]
 med_risk  = results[(results["failure_probability"] >= 30) &
                     (results["failure_probability"] < 70)]
 
-n_high = min(mix_high, le
+n_high = min(mix_high, len(high_risk))
+n_med  = min(mix_low,  len(med_risk))
+
+sample = pd.concat([
+    high_risk.sample(n_high, random_state=42) if n_high > 0 else pd.DataFrame(),
+    med_risk.sample(n_med,   random_state=42) if n_med  > 0 else pd.DataFrame(),
+]).sort_values("failure_probability", ascending=True)
+
+labels     = [f"Machine {idx}" for idx in sample.index]
+bar_colors = [COLORS_MAP.get(f, "gray") for f in sample["Failure Type Text"]]
+
+fig = make_subplots(rows=1, cols=2,
+                    subplot_titles=("Failure Probability by Machine",
+                                    "Failure Type vs Probability"))
+
+# Chart 1 — horizontal bar
+fig.add_trace(go.Bar(
+    x=sample["failure_probability"].round(2),
+    y=labels,
+    orientation="h",
+    marker_color=bar_colors,
+    text=[f"{p:.2f}% — {f}" for p, f in
+          zip(sample["failure_probability"], sample["Failure Type Text"])],
+    textposition="outside",
+    hovertemplate="<b>%{y}</b><br>Probability: %{x:.2f}%<extra></extra>",
+), row=1, col=1)
+
+# Chart 2 — scatter by failure type
+for ftype, group in sample.groupby("Failure Type Text"):
+    idx_positions = [list(sample.index).index(i) for i in group.index]
+    fig.add_trace(go.Scatter(
+        x=group["failure_probability"].round(2),
+        y=[labels[i] for i in idx_positions],
+        mode="markers",
+        name=ftype,
+        marker=dict(color=COLORS_MAP.get(ftype, "gray"), size=14),
+        hovertemplate=f"<b>%{{y}}</b><br>Type: {ftype}<br>Probability: %{{x:.2f}}%<extra></extra>",
+    ), row=1, col=2)
+
+fig.add_vline(x=70, line_dash="dash", line_color="red",
+              annotation_text="High (70%)",   row=1, col=2)
+fig.add_vline(x=30, line_dash="dash", line_color="orange",
+              annotation_text="Medium (30%)", row=1, col=2)
+fig.update_layout(height=500, showlegend=True, plot_bgcolor="white")
+fig.update_xaxes(title_text="Failure Probability (%)", range=[0, 130], row=1, col=1)
+fig.update_xaxes(title_text="Failure Probability (%)", range=[0, 120], row=1, col=2)
+
+st.plotly_chart(fig, use_container_width=True)
+st.divider()
+
+# ──────────────────────────────────────────────
+# Summary table
+# ──────────────────────────────────────────────
+
+st.subheader("📋 Risk Summary Table")
+display_cols = ["failure_probability", "risk_level", "Failure Type Text", "Actual Target"]
+col_rename   = {"failure_probability": "Probability (%)", "risk_level": "Risk Level",
+                "Failure Type Text":   "Failure Type",    "Actual Target": "Actual Failure"}
+st.dataframe(sample[display_cols].rename(columns=col_rename), use_container_width=True)
+st.divider()
+
+# ──────────────────────────────────────────────
+# Footer
+# ──────────────────────────────────────────────
+
+st.caption(f"Dataset: AI4I 2020 Predictive Maintenance | "
+           f"Dashboard: Random Forest | Threshold: {threshold} | "
+           f"[GitHub]({GITHUB_URL})")
