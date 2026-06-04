@@ -53,6 +53,7 @@ This notebook is for analysis only and is not part of the production pipeline.
 ---
 ##  Links
 
-- [Streamlit Dashboard]([https://your-app-url.streamlit.app](https://ipapplutionpredictivemaintenance-hcyrqtiup35e3mhgljkbdv.streamlit.app/))
+- [Streamlit Dashboard]
+- ([https://your-app-url.streamlit.app](https://ipapplutionpredictivemaintenance-hcyrqtiup35e3mhgljkbdv.streamlit.app/))
 - [GitHub Repository](https://github.com/mila151107/IPS_solution_predictive_maintenance)
 - [Dataset — Kaggle](https://www.kaggle.com/datasets/stephanmatzka/predictive-maintenance-dataset-ai4i-2020)
