@@ -30,7 +30,7 @@ from preprocessing import (
 # ──────────────────────────────────────────────
 
 GITHUB_URL   = "https://github.com/mila151107/IPS_solution_predictive_maintenance"
-DATA_PATH    = "data/predictive_maintenance.csv"
+DATA_PATH    = "predictive_maintenance.csv"
 ARTIFACT_DIR = "artifacts"
 LGBM_PATH    = os.path.join(ARTIFACT_DIR, "lgbm_model.joblib")
 RF_PATH      = os.path.join(ARTIFACT_DIR, "rf_model.joblib")
