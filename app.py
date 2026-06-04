@@ -17,7 +17,7 @@ from preprocessing import preprocess
 # Config
 # ──────────────────────────────────────────────
 
-DATA_PATH  = "data/predictive_maintenance.csv"
+DATA_PATH  = "predictive_maintenance.csv"
 LGBM_PATH  = "artifacts/lgbm_model.joblib"
 XGB_PATH   = "artifacts/xgb_model.joblib"
 RF_PATH    = "artifacts/rf_model.joblib"
