@@ -87,8 +87,8 @@ def load_and_train():
     X_test.columns  = X_test.columns.str.replace(r"[\[\]/]", "_", regex=True).str.strip()
 
     # SMOTE
-    smote = SMOTE(sampling_strategy=0.3, random_state=42)
-    X_train, y_train = smote.fit_resample(X_train, y_train)
+    # smote = SMOTE(sampling_strategy=0.3, random_state=42)
+    # X_train, y_train = smote.fit_resample(X_train, y_train)
 
     # Train models
     lgbm = LGBMClassifier(n_estimators=100, learning_rate=0.05, num_leaves=15,
@@ -232,3 +232,4 @@ st.divider()
 
 st.caption(f"Dataset: AI4I 2020 Predictive Maintenance | Models: LightGBM + Random Forest | "
            f"[GitHub]({GITHUB_URL})")
+
