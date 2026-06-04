@@ -1,9 +1,9 @@
-# test_train_model.py
 import pytest
 import pandas as pd
 from sklearn.datasets import make_classification
-from train_model import get_models, evaluate
 from sklearn.model_selection import StratifiedKFold
+
+from ips_train.train_model import get_models, evaluate
 
 
 def make_data():
