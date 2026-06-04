@@ -1,6 +1,4 @@
 """
-train_model.py
---------------
 XGBoost, Random Forest, Logistic Regression
 on AI4I 2020 Predictive Maintenance Dataset.
 
@@ -23,21 +21,17 @@ from sklearn.preprocessing import MinMaxScaler
 
 from preprocessing import preprocess
 
-# ── Config ────────────────────────────────────
-
 ARTIFACT_DIR = "artifacts"
 PATHS = {
-    "XGBoost":             os.path.join(ARTIFACT_DIR, "xgb_model.joblib"),
-    "Random Forest":       os.path.join(ARTIFACT_DIR, "rf_model.joblib"),
+    "XGBoost": os.path.join(ARTIFACT_DIR, "xgb_model.joblib"),
+    "Random Forest": os.path.join(ARTIFACT_DIR, "rf_model.joblib"),
     "Logistic Regression": os.path.join(ARTIFACT_DIR, "lr_model.joblib"),
-    "mm_scaler":           os.path.join(ARTIFACT_DIR, "mm_scaler.joblib"),
+    "mm_scaler": os.path.join(ARTIFACT_DIR, "mm_scaler.joblib"),
 }
-TEST_SIZE    = 0.3
+TEST_SIZE = 0.3
 RANDOM_STATE = 42
-CV_FOLDS     = 5
+CV_FOLDS = 5
 
-
-# ── Models ────────────────────────────────────
 
 def get_models(spw: float) -> dict:
     xgb_base = XGBClassifier(
@@ -75,33 +69,31 @@ def get_models(spw: float) -> dict:
     }
 
 
-# ── Evaluate ──────────────────────────────────
-
 def evaluate(model, X_tr, X_te, y_tr, y_te, name, threshold, cv):
     y_proba = model.predict_proba(X_te)[:, 1]
-    y_pred  = (y_proba >= threshold).astype(int)
+    y_pred = (y_proba >= threshold).astype(int)
     cv_mean = cross_val_score(model, X_tr, y_tr, cv=cv, scoring="f1").mean()
 
-    print(f"{name:25s} | F1: {f1_score(y_te, y_pred):.4f} | "
-          f"AUC: {roc_auc_score(y_te, y_proba):.4f} | "
-          f"P: {precision_score(y_te, y_pred, zero_division=0):.4f} | "
-          f"R: {recall_score(y_te, y_pred, zero_division=0):.4f} | "
-          f"CV F1: {cv_mean:.4f}")
+    print(
+        f"{name:25s} | F1: {f1_score(y_te, y_pred):.4f} | "
+        f"AUC: {roc_auc_score(y_te, y_proba):.4f} | "
+        f"P: {precision_score(y_te, y_pred, zero_division=0):.4f} | "
+        f"R: {recall_score(y_te, y_pred, zero_division=0):.4f} | "
+        f"CV F1: {cv_mean:.4f}"
+    )
 
     return {
-        "f1":        f1_score(y_te, y_pred),
-        "roc_auc":   roc_auc_score(y_te, y_proba),
+        "f1": f1_score(y_te, y_pred),
+        "roc_auc": roc_auc_score(y_te, y_proba),
         "precision": precision_score(y_te, y_pred, zero_division=0),
-        "recall":    recall_score(y_te, y_pred, zero_division=0),
-        "cv_f1":     cv_mean,
+        "recall": recall_score(y_te, y_pred, zero_division=0),
+        "cv_f1": cv_mean,
     }
 
 
-# ── Main ──────────────────────────────────────
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input",     default="predictive_maintenance.csv")
+    parser.add_argument("--input", default="predictive_maintenance.csv")
     parser.add_argument("--threshold", default=0.70, type=float)
     args, _ = parser.parse_known_args()
 
@@ -124,22 +116,20 @@ if __name__ == "__main__":
     # 4. MinMax scale for Logistic Regression only
     mm = MinMaxScaler()
     X_train_mm = pd.DataFrame(mm.fit_transform(X_train), columns=X_train.columns)
-    X_test_mm  = pd.DataFrame(mm.transform(X_test),      columns=X_test.columns)
+    X_test_mm = pd.DataFrame(mm.transform(X_test), columns=X_test.columns)
 
     # 5. Train & evaluate
-    cv      = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
-    models  = get_models(spw)
+    cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    models = get_models(spw)
     results = {}
 
     print(f"\n{'Model':25s} | F1     | AUC    | P      | R      | CV F1")
     print("-" * 75)
 
     for name, model in models.items():
-        X_tr, X_te = (X_train_mm, X_test_mm) if name == "Logistic Regression" \
-                     else (X_train, X_test)
+        X_tr, X_te = (X_train_mm, X_test_mm) if name == "Logistic Regression" else (X_train, X_test)
         model.fit(X_tr, y_train)
-        results[name] = evaluate(model, X_tr, X_te, y_train, y_test,
-                                 name, args.threshold, cv)
+        results[name] = evaluate(model, X_tr, X_te, y_train, y_test, name, args.threshold, cv)
 
     # 6. Summary
     best = "XGBoost"

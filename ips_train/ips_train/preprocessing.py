@@ -1,6 +1,4 @@
 """
-preprocessing.py
-----------------
 Feature engineering + preprocessing pipeline for the AI4I 2020 Predictive Maintenance Dataset.
 Run directly to fit, serialize, and save the pipeline artifact.
 
@@ -9,9 +7,9 @@ Usage:
     python preprocessing.py --input my_data.csv     # custom input file
 """
 
-import argparse
 import os
 
+import click
 import joblib
 import numpy as np
 import pandas as pd
@@ -19,19 +17,28 @@ from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-# ──────────────────────────────────────────────
-# Config
-# ──────────────────────────────────────────────
-
-COLUMNS_TO_DROP  = ["UDI", "Process temperature [K]", "Air temperature [K]", "Torque/RPM ratio"]
-CATEGORICAL_COLS = ["Product ID", "Type", "Failure Type"]
-NUMERICAL_COLS   = [
-    "Rotational speed [rpm]", "Torque [Nm]", "Tool wear [min]",
-    "Angular speed [rad/s]", "Power [kW]", "Delta Temperature [K]", "Stress Index",
-]
-TARGET_COL       = "Target"
-ARTIFACT_DIR     = "artifacts"
-PREPROCESSOR_PATH = os.path.join(ARTIFACT_DIR, "preprocessor.joblib")
+from .data import (
+    AIR_TEMPERATURE_COL,
+    ANGULAR_SPEED_COL,
+    CATEGORICAL_COLS,
+    COLUMNS_TO_DROP,
+    DELTA_TEMPERATURE_COL,
+    FAILURE_TYPE_COL,
+    INPUT_DATASET,
+    NUMERICAL_COLS,
+    POWER_COL,
+    PRODUCT_ID_COL,
+    PROCESS_TEMPERATURE_COL,
+    PREPROCESSOR_PATH,
+    ROTATIONAL_SPEED_COL,
+    STRESS_INDEX_COL,
+    TARGET_COL,
+    TOOL_WEAR_COL,
+    TORQUE_COL,
+    TORQUE_RPM_RATIO_COL,
+    TYPE_COL,
+    UDI_COL,
+)
 
 
 # ──────────────────────────────────────────────
@@ -41,11 +48,11 @@ PREPROCESSOR_PATH = os.path.join(ARTIFACT_DIR, "preprocessor.joblib")
 def compute_features(df: pd.DataFrame) -> pd.DataFrame:
     """Adds engineered features derived from raw sensor columns."""
     df = df.copy()
-    df["Angular speed [rad/s]"] = df["Rotational speed [rpm]"] * (2 * np.pi / 60)
-    df["Power [kW]"]            = (df["Torque [Nm]"] * df["Angular speed [rad/s]"]) / 1000
-    df["Delta Temperature [K]"] = df["Process temperature [K]"] - df["Air temperature [K]"]
-    df["Torque/RPM ratio"]      = df["Torque [Nm]"] / df["Rotational speed [rpm]"]
-    df["Stress Index"]          = df["Power [kW]"] * df["Delta Temperature [K]"]
+    df[ANGULAR_SPEED_COL] = df[ROTATIONAL_SPEED_COL] * (2 * np.pi / 60)
+    df[POWER_COL] = (df[TORQUE_COL] * df[ANGULAR_SPEED_COL]) / 1000
+    df[DELTA_TEMPERATURE_COL] = df[PROCESS_TEMPERATURE_COL] - df[AIR_TEMPERATURE_COL]
+    df[TORQUE_RPM_RATIO_COL] = df[TORQUE_COL] / df[ROTATIONAL_SPEED_COL]
+    df[STRESS_INDEX_COL] = df[POWER_COL] * df[DELTA_TEMPERATURE_COL]
     return df
 
 
@@ -106,17 +113,21 @@ class NumericalScaler(BaseEstimator, TransformerMixin):
 # Step 3 — Build Pipeline
 # ──────────────────────────────────────────────
 
+
 def build_pipeline() -> Pipeline:
-    return Pipeline(steps=[
-        ("drop_columns",   ColumnDropper(columns=COLUMNS_TO_DROP)),
-        ("encode_cats",    CategoricalEncoder(columns=CATEGORICAL_COLS)),
-        ("scale_numerics", NumericalScaler(columns=NUMERICAL_COLS)),
-    ])
+    return Pipeline(
+        steps=[
+            ("drop_columns", ColumnDropper(columns=COLUMNS_TO_DROP)),
+            ("encode_cats", CategoricalEncoder(columns=CATEGORICAL_COLS)),
+            ("scale_numerics", NumericalScaler(columns=NUMERICAL_COLS)),
+        ]
+    )
 
 
 # ──────────────────────────────────────────────
 # Public API — used by training & Streamlit app
 # ──────────────────────────────────────────────
+
 
 def preprocess(df: pd.DataFrame, fit: bool = True):
     """
@@ -155,8 +166,9 @@ def preprocess(df: pd.DataFrame, fit: bool = True):
 # Serialization helpers
 # ──────────────────────────────────────────────
 
-def save_preprocessor(pipeline: Pipeline, path: str = PREPROCESSOR_PATH) -> None:
-    os.makedirs(ARTIFACT_DIR, exist_ok=True)
+
+def save_preprocessor(pipeline: Pipeline, path: str) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
     joblib.dump(pipeline, path)
     print(f"✅ Preprocessor saved → {path}")
 
@@ -167,17 +179,11 @@ def load_preprocessor(path: str = PREPROCESSOR_PATH) -> Pipeline:
     return joblib.load(path)
 
 
-# ──────────────────────────────────────────────
-# Entry point — run to fit & serialize
-# ──────────────────────────────────────────────
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="predictive_maintenance.csv", help="Path to raw CSV")
-    args = parser.parse_args()
-
+@click.option("--input", type=str, default=INPUT_DATASET, help="Path to raw CSV")
+@click.option("--ouptut", type=str, default=PREPROCESSOR_PATH, help="Output path")
+def main(input_path: str) -> None:
     print(f"📂 Loading: {args.input}")
-    df = pd.read_csv(args.input)
+    df = pd.read_csv(input_path)
     print(f"   Raw shape: {df.shape}")
 
     X, y, pipeline = preprocess(df, fit=True)
@@ -187,3 +193,6 @@ if __name__ == "__main__":
     print(f"\n   Target distribution:\n{y.value_counts().to_string()}")
 
     save_preprocessor(pipeline)
+
+if __name__ == "__main__":
+    main()
