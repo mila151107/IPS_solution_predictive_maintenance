@@ -51,9 +51,9 @@ def load_and_prepare():
     df1 = df.copy()
     df  = compute_features(df)
 
+    # Keep Product ID and Failure Type — model was trained with them
     cols_drop = [TARGET_COL, "UDI", "Process temperature [K]",
-                 "Air temperature [K]", "Torque/RPM ratio",
-                 "Product ID", "Failure Type"]
+                 "Air temperature [K]", "Torque/RPM ratio"]
     X = df.drop(columns=cols_drop, errors="ignore")
     y = df[TARGET_COL]
 
@@ -219,20 +219,21 @@ with c3:
 
 if st.button("🔮 Predict", use_container_width=True):
     input_raw = pd.DataFrame([{
-        "UDI": 1, "Product ID": f"{prod_type}-00001",
+        "UDI": 1,
+        "Product ID": f"{prod_type}-00001",
         "Type": prod_type,
         "Air temperature [K]": air_temp,
         "Process temperature [K]": proc_temp,
         "Rotational speed [rpm]": rpm,
         "Torque [Nm]": torque,
         "Tool wear [min]": tool_wear,
-        "Target": 0, "Failure Type": "No Failure",
+        "Target": 0,
+        "Failure Type": "No Failure",
     }])
 
     input_eng = compute_features(input_raw)
     cols_drop = [TARGET_COL, "UDI", "Process temperature [K]",
-                 "Air temperature [K]", "Torque/RPM ratio",
-                 "Product ID", "Failure Type"]
+                 "Air temperature [K]", "Torque/RPM ratio"]
     X_input = input_eng.drop(columns=cols_drop, errors="ignore")
 
     encoder = CategoricalEncoder(columns=CATEGORICAL_COLS)
