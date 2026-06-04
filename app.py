@@ -5,189 +5,242 @@ Streamlit app for the AI4I 2020 Predictive Maintenance Dataset.
 """
 
 import os
+import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from lightgbm import LGBMClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import f1_score
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
 
-from preprocessing import (
-    compute_features, CategoricalEncoder, NumericalScaler,
-    CATEGORICAL_COLS, NUMERICAL_COLS, TARGET_COL
-)
+from preprocessing import preprocess
 
+# ──────────────────────────────────────────────
+# Config
+# ──────────────────────────────────────────────
+
+DATA_PATH  = "data/predictive_maintenance.csv"
+LGBM_PATH  = "artifacts/lgbm_model.joblib"
+XGB_PATH   = "artifacts/xgb_model.joblib"
+RF_PATH    = "artifacts/rf_model.joblib"
+LR_PATH    = "artifacts/lr_model.joblib"
+MM_PATH    = "artifacts/mm_scaler.joblib"
 GITHUB_URL = "https://github.com/mila151107/IPS_solution_predictive_maintenance"
-DATA_PATH  = "predictive_maintenance.csv"
 
-COLORS_MAP = {
-    "Power Failure":            "#e74c3c",
-    "Tool Wear Failure":        "#3498db",
-    "Overstrain Failure":       "#f39c12",
-    "Heat Dissipation Failure": "#2ecc71",
-    "Random Failures":          "#9b59b6",
-    "No Failure":               "#95a5a6",
-}
+
+# ──────────────────────────────────────────────
+# Load resources
+# ──────────────────────────────────────────────
+
+@st.cache_data
+def load_data():
+    return pd.read_csv(DATA_PATH)
 
 @st.cache_resource
-def load_and_train():
-    df  = pd.read_csv(DATA_PATH)
-    df1 = df.copy()
-    df  = compute_features(df)
+def load_models():
+    lgbm = joblib.load(LGBM_PATH)
+    xgb  = joblib.load(XGB_PATH)
+    rf   = joblib.load(RF_PATH)
+    lr   = joblib.load(LR_PATH)
+    mm   = joblib.load(MM_PATH)
+    return lgbm, xgb, rf, lr, mm
 
-    train_df, test_df = train_test_split(
-        df, test_size=0.3, random_state=42, stratify=df[TARGET_COL]
-    )
-
-    cols_drop = [TARGET_COL, "UDI", "Process temperature [K]",
-                 "Air temperature [K]", "Torque/RPM ratio", "Product ID"]
-    X_train = train_df.drop(columns=cols_drop, errors="ignore")
-    y_train = train_df[TARGET_COL]
-    X_test  = test_df.drop(columns=cols_drop, errors="ignore")
-    y_test  = test_df[TARGET_COL]
-
-    encoder = CategoricalEncoder(columns=CATEGORICAL_COLS)
-    encoder.fit(X_train)
-    X_train = encoder.transform(X_train)
-    X_test  = encoder.transform(X_test)
-
-    scaler  = NumericalScaler(columns=NUMERICAL_COLS)
-    X_train = scaler.fit_transform(X_train)
-    X_test  = scaler.transform(X_test)
-
-    X_train.columns = X_train.columns.str.replace(r"[\[\]/]", "_", regex=True).str.strip()
-    X_test.columns  = X_test.columns.str.replace(r"[\[\]/]", "_", regex=True).str.strip()
-
-    # MinMax-scaled copies for Logistic Regression
-    mm = MinMaxScaler()
-    X_train_mm = pd.DataFrame(mm.fit_transform(X_train), columns=X_train.columns)
-    X_test_mm  = pd.DataFrame(mm.transform(X_test),      columns=X_test.columns)
-
-    # Fit tree models
-    lgbm = LGBMClassifier(n_estimators=200, learning_rate=0.01, num_leaves=10,
-                           max_depth=4, min_child_samples=30, class_weight="balanced",
-                           importance_type="gain", random_state=42)
-    rf   = RandomForestClassifier(n_estimators=200, max_depth=10,
-                                   class_weight="balanced", random_state=42)
-    lr   = LogisticRegression(max_iter=5000, C=1.0, class_weight="balanced",
-                               solver="saga", random_state=42)
-    lgbm.fit(X_train, y_train)
-    rf.fit(X_train,   y_train)
-    lr.fit(X_train_mm, y_train)
-
-    # RF probabilities drive the risk table (kept as before)
-    y_proba_rf = rf.predict_proba(X_test)[:, 1]
-    y_pred_rf  = (y_proba_rf >= 0.3).astype(int)
-
-    results = X_test.copy()
-    results["failure_probability"] = (y_proba_rf * 100).round(2)
-    results["risk_level"]          = results["failure_probability"].apply(
-        lambda x: "🔴 HIGH" if x >= 70 else "🟡 MEDIUM" if x >= 30 else "🟢 LOW"
-    )
-    results["predicted_failure"]  = y_pred_rf
-    results["Failure Type Text"]  = df1.loc[results.index, "Failure Type"].values
-    results["Actual Target"]      = df1.loc[results.index, "Target"].values
-
-    metrics = {
-        "LightGBM":            f1_score(y_test, lgbm.predict(X_test)),
-        "Random Forest":       f1_score(y_test, rf.predict(X_test)),
-        "Logistic Regression": f1_score(y_test, lr.predict(X_test_mm)),
-    }
-
-    return lgbm, rf, lr, results, y_test, metrics
+@st.cache_data
+def get_processed_data():
+    df = load_data()
+    X, y, _ = preprocess(df, fit=False)
+    X.columns = X.columns.str.replace(r"[\[\]/]", "_", regex=True).str.strip()
+    return X, y
 
 
-# ── Layout ──────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────
+# Layout
+# ──────────────────────────────────────────────
 
 st.set_page_config(page_title="Predictive Maintenance", page_icon="🔧", layout="wide")
 st.title("🔧 Predictive Maintenance — Failure Risk Dashboard")
 st.markdown(f"Real-time machine failure risk assessment. [View source on GitHub]({GITHUB_URL})")
 st.divider()
 
-with st.spinner("⚙️ Loading data and training models..."):
-    lgbm, rf, lr, results, y_test, metrics = load_and_train()
+with st.spinner("Loading data and models..."):
+    df_raw                    = load_data()
+    lgbm, xgb, rf, lr, mm_scaler = load_models()
+    X, y                      = get_processed_data()
 
-# ── Sidebar ──────────────────────────────────────────────────────────────────
+
+# ──────────────────────────────────────────────
+# Sidebar
+# ──────────────────────────────────────────────
 
 st.sidebar.header("⚙️ Settings")
-n_machines = st.sidebar.slider("Number of machines to display", 5, 20, 10)
-mix_high   = st.sidebar.slider("High risk machines",   1, 10, 5)
-mix_low    = st.sidebar.slider("Medium risk machines", 1, 10, 5)
+
+model_name = st.sidebar.radio(
+    "Select model",
+    ["LightGBM", "XGBoost", "Random Forest", "Logistic Regression"]
+)
+
+threshold = st.sidebar.slider(
+    "Failure prediction threshold",
+    min_value=0.10,
+    max_value=0.50,
+    value=0.25,
+    step=0.05,
+    help="Lower = catch more failures. Higher = fewer false alarms."
+)
+
+sample_size = st.sidebar.slider(
+    "Number of rows to predict",
+    min_value=10, max_value=500, value=100, step=10,
+)
+
 st.sidebar.divider()
 st.sidebar.markdown(f"🔗 [GitHub Repository]({GITHUB_URL})")
 
-# ── Model metrics (F1 only) ───────────────────────────────────────────────────
 
-st.subheader("📊 Model Performance — F1 Score")
-cols = st.columns(len(metrics))
-for col, (name, f1) in zip(cols, metrics.items()):
-    col.metric(f"{name} F1", f"{f1:.4f}")
+# ──────────────────────────────────────────────
+# Predictions
+# ──────────────────────────────────────────────
+
+model_map = {
+    "LightGBM":            lgbm,
+    "XGBoost":             xgb,
+    "Random Forest":       rf,
+    "Logistic Regression": lr,
+}
+model    = model_map[model_name]
+X_sample = X.iloc[:sample_size]
+y_sample = y.iloc[:sample_size]
+
+X_input = pd.DataFrame(
+    mm_scaler.transform(X_sample), columns=X_sample.columns
+) if model_name == "Logistic Regression" else X_sample
+
+y_proba = model.predict_proba(X_input)[:, 1]
+y_pred  = (y_proba >= threshold).astype(int)
+
+
+# ──────────────────────────────────────────────
+# Metrics row
+# ──────────────────────────────────────────────
+
+total      = len(y_pred)
+failures   = int(y_pred.sum())
+no_failure = total - failures
+
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Total machines",        total)
+c2.metric("🔴 Predicted failures", failures)
+c3.metric("🟢 No failure",         no_failure)
+c4.metric("Threshold",             f"{threshold:.2f}")
 st.divider()
 
-# ── Risk assessment chart ─────────────────────────────────────────────────────
 
-st.subheader("🎯 Machine Risk Assessment")
+# ──────────────────────────────────────────────
+# Distribution chart
+# ──────────────────────────────────────────────
 
-high_risk = results[results["failure_probability"] >= 70]
-med_risk  = results[(results["failure_probability"] >= 30) & (results["failure_probability"] < 70)]
+st.subheader("🎯 Failure Probability Distribution")
 
-n_high = min(mix_high, len(high_risk))
-n_med  = min(mix_low,  len(med_risk))
+results_df = X_sample.copy()
+results_df["Failure Probability"] = (y_proba * 100).round(2)
+results_df["Predicted"]           = y_pred
+results_df["Actual"]              = y_sample.values
+results_df["Risk Level"]          = results_df["Failure Probability"].apply(
+    lambda x: "🔴 HIGH" if x >= 70 else "🟡 MEDIUM" if x >= 30 else "🟢 LOW"
+)
 
-sample = pd.concat([
-    high_risk.sample(n_high, random_state=42) if n_high > 0 else pd.DataFrame(),
-    med_risk.sample(n_med,   random_state=42) if n_med  > 0 else pd.DataFrame(),
-]).sort_values("failure_probability", ascending=True)
-
-labels     = [f"Machine {idx}" for idx in sample.index]
-bar_colors = [COLORS_MAP.get(f, "gray") for f in sample["Failure Type Text"]]
-
-fig = make_subplots(rows=1, cols=2,
-                    subplot_titles=("Failure Probability by Machine",
-                                    "Failure Type vs Probability"))
-
-fig.add_trace(go.Bar(
-    x=sample["failure_probability"].round(2),
-    y=labels, orientation="h",
-    marker_color=bar_colors,
-    text=[f"{p:.2f}% — {f}" for p, f in
-          zip(sample["failure_probability"], sample["Failure Type Text"])],
-    textposition="outside",
-    hovertemplate="<b>%{y}</b><br>Probability: %{x:.2f}%<extra></extra>",
-), row=1, col=1)
-
-for ftype, group in sample.groupby("Failure Type Text"):
-    idx_positions = [list(sample.index).index(i) for i in group.index]
-    fig.add_trace(go.Scatter(
-        x=group["failure_probability"].round(2),
-        y=[labels[i] for i in idx_positions],
-        mode="markers", name=ftype,
-        marker=dict(color=COLORS_MAP.get(ftype, "gray"), size=14),
-        hovertemplate=f"<b>%{{y}}</b><br>Type: {ftype}<br>Probability: %{{x:.2f}}%<extra></extra>",
-    ), row=1, col=2)
-
-fig.add_vline(x=70, line_dash="dash", line_color="red",    annotation_text="High (70%)",   row=1, col=2)
-fig.add_vline(x=30, line_dash="dash", line_color="orange", annotation_text="Medium (30%)", row=1, col=2)
-fig.update_layout(height=500, showlegend=True, plot_bgcolor="white")
-fig.update_xaxes(title_text="Failure Probability (%)", range=[0, 130], row=1, col=1)
-fig.update_xaxes(title_text="Failure Probability (%)", range=[0, 120], row=1, col=2)
-
+fig = go.Figure()
+fig.add_trace(go.Histogram(
+    x=results_df["Failure Probability"],
+    nbinsx=20,
+    marker_color="#3498db",
+    opacity=0.75,
+))
+fig.add_vline(
+    x=threshold * 100, line_dash="dash", line_color="red",
+    annotation_text=f"Threshold ({threshold*100:.0f}%)"
+)
+fig.update_layout(
+    xaxis_title="Failure Probability (%)",
+    yaxis_title="Number of Machines",
+    plot_bgcolor="white",
+    height=350,
+)
 st.plotly_chart(fig, use_container_width=True)
 st.divider()
 
-# ── Summary table ─────────────────────────────────────────────────────────────
 
-st.subheader("📋 Risk Summary Table")
-display_cols = ["failure_probability", "risk_level", "Failure Type Text", "Actual Target"]
-col_rename   = {"failure_probability": "Probability (%)", "risk_level": "Risk Level",
-                "Failure Type Text": "Failure Type", "Actual Target": "Actual Failure"}
-st.dataframe(sample[display_cols].rename(columns=col_rename), use_container_width=True)
+# ──────────────────────────────────────────────
+# Results table
+# ──────────────────────────────────────────────
+
+st.subheader("📋 Prediction Results")
+
+extra_cols = [c for c in ["Rotational_speed__rpm_", "Torque__Nm_", "Tool_wear__min_"]
+              if c in results_df.columns]
+
+st.dataframe(
+    results_df[["Risk Level", "Failure Probability", "Predicted", "Actual"] + extra_cols],
+    use_container_width=True,
+    height=400,
+)
 st.divider()
 
-st.caption(f"Dataset:  Predictive Maintenance | Models: LightGBM + Random Forest + Logistic Regression | "
-           f"[GitHub]({GITHUB_URL})")
+
+# ──────────────────────────────────────────────
+# Single machine prediction
+# ──────────────────────────────────────────────
+
+st.subheader("🔍 Predict a Single Machine")
+st.markdown("Adjust sensor values and click **Predict**.")
+
+c1, c2, c3 = st.columns(3)
+with c1:
+    rpm       = st.number_input("Rotational speed [rpm]", min_value=1000, max_value=3000, value=1500)
+    torque    = st.number_input("Torque [Nm]", min_value=1.0, max_value=100.0, value=40.0)
+with c2:
+    tool_wear = st.number_input("Tool wear [min]", min_value=0, max_value=300, value=100)
+    air_temp  = st.number_input("Air temperature [K]", min_value=295.0, max_value=305.0, value=300.0)
+with c3:
+    proc_temp = st.number_input("Process temperature [K]", min_value=305.0, max_value=315.0, value=310.0)
+    prod_type = st.selectbox("Product type", ["L", "M", "H"])
+
+if st.button("🔮 Predict", use_container_width=True):
+    input_df = pd.DataFrame([{
+        "UDI":                     1,
+        "Product ID":              f"{prod_type}-00001",
+        "Type":                    prod_type,
+        "Air temperature [K]":     air_temp,
+        "Process temperature [K]": proc_temp,
+        "Rotational speed [rpm]":  rpm,
+        "Torque [Nm]":             torque,
+        "Tool wear [min]":         tool_wear,
+        "Target":                  0,
+        "Failure Type":            "No Failure",
+    }])
+
+    X_single, _, _ = preprocess(input_df, fit=False)
+    X_single.columns = X_single.columns.str.replace(
+        r"[\[\]/]", "_", regex=True).str.strip()
+
+    if model_name == "Logistic Regression":
+        X_single = pd.DataFrame(
+            mm_scaler.transform(X_single), columns=X_single.columns)
+
+    proba = model.predict_proba(X_single)[0][1]
+    pred  = int(proba >= threshold)
+
+    if pred == 1:
+        st.error(f"🔴 **Failure predicted** — {proba*100:.1f}% probability")
+    else:
+        st.success(f"🟢 **No failure predicted** — {proba*100:.1f}% probability")
+
+
+# ──────────────────────────────────────────────
+# Footer
+# ──────────────────────────────────────────────
+
+st.divider()
+st.caption(
+    f"Dataset: AI4I 2020 Predictive Maintenance | "
+    f"Model: {model_name} | Threshold: {threshold} | "
+    f"[GitHub]({GITHUB_URL})"
+)

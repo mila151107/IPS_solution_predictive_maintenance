@@ -1,162 +1,134 @@
 """
-train.py
---------
-This script trains two classification models — LightGBM and Logistic Regression —
-on the preprocessed predictive maintenance data. It evaluates both models using
-F1 score, ROC-AUC, and cross-validation, then serializes the trained models
-to the folder for deployment.
+train_model.py
+--------------
+XGBoost, Random Forest, Logistic Regression
+on AI4I 2020 Predictive Maintenance Dataset.
 
 Usage:
-    python train.py
-    python train.py --input my_data.csv
+    python train_model.py
+    python train_model.py --input my_data.csv --threshold 0.25
 """
 
 import argparse
 import os
-
 import joblib
-import numpy as np
 import pandas as pd
-from lightgbm import LGBMClassifier
+from xgboost import XGBClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, f1_score, roc_auc_score
-from sklearn.model_selection import cross_val_score, train_test_split
+from sklearn.metrics import f1_score, roc_auc_score, precision_score, recall_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score, train_test_split
+from sklearn.preprocessing import MinMaxScaler
 
 from preprocessing import preprocess
 
-# ──────────────────────────────────────────────
-# Config
-# Paths, hyperparameters, and split settings
-# in one place — easy to change without touching the logic below.
-# ──────────────────────────────────────────────
+# ── Config ────────────────────────────────────
 
-ARTIFACT_DIR    = "artifacts"
-LGBM_PATH       = os.path.join(ARTIFACT_DIR, "lgbm_model.joblib")
-LR_PATH         = os.path.join(ARTIFACT_DIR, "lr_model.joblib")
-
-TEST_SIZE       = 0.3     # 30% test, 70% train
-RANDOM_STATE    = 42
-CV_FOLDS        = 5       # number of cross-validation folds
-
-
-# ──────────────────────────────────────────────
-# Model definitions
-# class_weight="balanced" adjusts for the imbalanced dataset
-# (~3% failures) so the model doesn't just predict "no failure" always.
-# ──────────────────────────────────────────────
-
-def get_models():
-    lgbm = LGBMClassifier(
-        n_estimators=200,
-        learning_rate=0.05,
-        num_leaves=31,
-        class_weight="balanced",
-        importance_type="gain",
-        random_state=RANDOM_STATE,
-    )
-
-    lr = LogisticRegression(
-        max_iter=1000,
-        class_weight="balanced",
-        random_state=RANDOM_STATE,
-    )
-
-    return {"LightGBM": lgbm, "Logistic Regression": lr}
+ARTIFACT_DIR = "artifacts"
+PATHS = {
+    "XGBoost":             os.path.join(ARTIFACT_DIR, "xgb_model.joblib"),
+    "Random Forest":       os.path.join(ARTIFACT_DIR, "rf_model.joblib"),
+    "Logistic Regression": os.path.join(ARTIFACT_DIR, "lr_model.joblib"),
+    "mm_scaler":           os.path.join(ARTIFACT_DIR, "mm_scaler.joblib"),
+}
+TEST_SIZE    = 0.3
+RANDOM_STATE = 42
+CV_FOLDS     = 5
 
 
-# ──────────────────────────────────────────────
-# Evaluation
-# Reports F1, ROC-AUC, and cross-validation score
-# for each model on the test set.
-# ──────────────────────────────────────────────
+# ── Models ────────────────────────────────────
 
-def evaluate(model, X_train, X_test, y_train, y_test, name):
-    y_pred  = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)[:, 1]
-
-    f1      = f1_score(y_test, y_pred)
-    roc_auc = roc_auc_score(y_test, y_proba)
-
-    print(f"\n{'='*40}")
-    print(f"  {name}")
-    print(f"{'='*40}")
-    print(classification_report(y_test, y_pred))
-    print(f"ROC-AUC : {roc_auc:.4f}")
-    print(f"F1 Score: {f1:.4f}")
-
-    # Cross-validation on training data
-    cv_scores = cross_val_score(model, X_train, y_train, cv=CV_FOLDS, scoring="f1")
-    print(f"CV F1   : {cv_scores.round(3)} | Mean: {cv_scores.mean():.3f}")
-
-    return f1, roc_auc
+def get_models(spw: float) -> dict:
+    return {
+        "XGBoost": XGBClassifier(
+            n_estimators=100, learning_rate=0.01, max_depth=3,
+            scale_pos_weight=spw, eval_metric="aucpr", random_state=RANDOM_STATE,
+        ),
+        "Random Forest": RandomForestClassifier(
+            n_estimators=100, max_depth=5, min_samples_leaf=14,
+            max_features="sqrt", class_weight="balanced_subsample", random_state=RANDOM_STATE,
+        ),
+        "Logistic Regression": LogisticRegression(
+            max_iter=10000, C=0.1, solver="saga", penalty="l1",
+            class_weight="balanced", random_state=RANDOM_STATE,
+        ),
+    }
 
 
-# ──────────────────────────────────────────────
-# Serialization
-# Saves each trained model to artifacts/ folder.
-# ──────────────────────────────────────────────
+# ── Evaluate ──────────────────────────────────
 
-def save_models(models):
-    os.makedirs(ARTIFACT_DIR, exist_ok=True)
-    paths = {"LightGBM": LGBM_PATH, "Logistic Regression": LR_PATH}
-    for name, model in models.items():
-        joblib.dump(model, paths[name])
-        print(f"✅ {name} saved → {paths[name]}")
+def evaluate(model, X_tr, X_te, y_tr, y_te, name, threshold, cv):
+    y_proba   = model.predict_proba(X_te)[:, 1]
+    y_pred    = (y_proba >= threshold).astype(int)
+    cv_mean   = cross_val_score(model, X_tr, y_tr, cv=cv, scoring="f1").mean()
+
+    print(f"{name:25s} | F1: {f1_score(y_te, y_pred):.4f} | "
+          f"AUC: {roc_auc_score(y_te, y_proba):.4f} | "
+          f"P: {precision_score(y_te, y_pred):.4f} | "
+          f"R: {recall_score(y_te, y_pred):.4f} | "
+          f"CV F1: {cv_mean:.4f}")
+
+    return {
+        "f1":        f1_score(y_te, y_pred),
+        "roc_auc":   roc_auc_score(y_te, y_proba),
+        "precision": precision_score(y_te, y_pred),
+        "recall":    recall_score(y_te, y_pred),
+        "cv_f1":     cv_mean,
+    }
 
 
-def load_model(name: str):
-    """Load a saved model by name: 'LightGBM' or 'Logistic Regression'."""
-    paths = {"LightGBM": LGBM_PATH, "Logistic Regression": LR_PATH}
-    path  = paths[name]
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"Model not found at {path}. Run train.py first.")
-    return joblib.load(path)
-
-
-# ──────────────────────────────────────────────
-# Main
-# ──────────────────────────────────────────────
+# ── Main ──────────────────────────────────────
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", default="predictive_maintenance.csv")
-    args = parser.parse_args()
+    parser.add_argument("--input",     default="predictive_maintenance.csv")
+    parser.add_argument("--threshold", default=0.25, type=float)
+    args, _ = parser.parse_known_args()
 
     # 1. Load & preprocess
-    print(f" Loading: {args.input}")
+    print(f"\n Loading: {args.input}")
     df = pd.read_csv(args.input)
-    X, y, pipeline = preprocess(df, fit=True)
-
-    # Clean column names (LightGBM dislikes special characters)
+    X, y, _ = preprocess(df, fit=True)
     X.columns = X.columns.str.replace(r"[\[\]/]", "_", regex=True).str.strip()
+    print(f"   Shape: {X.shape} | Failures: {y.sum()} / {len(y)}")
 
-    print(f" Preprocessed shape: {X.shape}")
-
-    # 2. Train/test split — stratified to preserve failure ratio
+    # 2. Stratified split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=TEST_SIZE, random_state=RANDOM_STATE, stratify=y
     )
-    print(f"\nTrain: {X_train.shape} | Test: {X_test.shape}")
-    print(f"Train failures: {y_train.sum()} | Test failures: {y_test.sum()}")
 
-    # 3. Train & evaluate both models
-    models   = get_models()
-    results  = {}
+    # 3. scale_pos_weight for XGBoost
+    spw = (y_train == 0).sum() / (y_train == 1).sum()
+    print(f"   scale_pos_weight: {spw:.2f}")
+
+    # 4. MinMax scale for Logistic Regression only
+    mm = MinMaxScaler()
+    X_train_mm = pd.DataFrame(mm.fit_transform(X_train), columns=X_train.columns)
+    X_test_mm  = pd.DataFrame(mm.transform(X_test),      columns=X_test.columns)
+
+    # 5. Train & evaluate
+    cv      = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
+    models  = get_models(spw)
+    results = {}
+
+    print(f"\n{'Model':25s} | F1     | AUC    | P      | R      | CV F1")
+    print("-" * 75)
 
     for name, model in models.items():
-        model.fit(X_train, y_train)
-        f1, roc_auc = evaluate(model, X_train, X_test, y_train, y_test, name)
-        results[name] = {"f1": f1, "roc_auc": roc_auc}
+        X_tr, X_te = (X_train_mm, X_test_mm) if name == "Logistic Regression" \
+                     else (X_train, X_test)
+        model.fit(X_tr, y_train)
+        results[name] = evaluate(model, X_tr, X_te, y_train, y_test,
+                                 name, args.threshold, cv)
 
-    # 4. Summary
-    print(f"\n{'='*40}")
-    print("  Summary")
-    print(f"{'='*40}")
-    for name, scores in results.items():
-        print(f"{name:25s} | F1: {scores['f1']:.4f} | ROC-AUC: {scores['roc_auc']:.4f}")
+    # 6. Summary
+    best = "Random Forest"
+    print(f"\n🏆 Selected model: {best} (fixed choice)")
 
-    best = max(results, key=lambda k: results[k]["f1"])
-    print(f"\n Best model by F1: {best}")
-
-    # 5. Save both models
-    save_models(models)
+    # 7. Save
+    os.makedirs(ARTIFACT_DIR, exist_ok=True)
+    for name, model in models.items():
+        joblib.dump(model, PATHS[name])
+        print(f"✅ {name} → {PATHS[name]}")
+    joblib.dump(mm, PATHS["mm_scaler"])
+    print(f"✅ mm_scaler → {PATHS['mm_scaler']}")
