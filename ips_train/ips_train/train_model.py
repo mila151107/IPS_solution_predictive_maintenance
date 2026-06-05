@@ -106,7 +106,7 @@ def train_model(input_path: str, threshold: float):
 
     mm = MinMaxScaler()
     X_train_mm = pd.DataFrame(mm.fit_transform(X_train), columns=X_train.columns)
-    X_test_mm = pd.DataFrame(mm.transform(X_test), columns=X_test.columns)
+    X_test_mm = pd.DataFrame((X_test), columns=X_test.columns)
 
     cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
     models = get_models(spw)
